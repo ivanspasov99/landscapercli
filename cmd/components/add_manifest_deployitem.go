@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"strings"
 
 	"github.com/gardener/landscaper/pkg/apis/core/v1alpha1"
 
@@ -32,7 +33,7 @@ landscaper-cli component add manifest deployitem \
   nginx \
   --file ./deployment.yaml \
   --file ./service.yaml \
-  --import-param target-ns(string)
+  --import-param replicas:integer
 `
 
 const addManifestDeployItemShort = `
@@ -155,7 +156,12 @@ func (o *addManifestDeployItemOptions) run(ctx context.Context, log logr.Logger)
 	}
 
 	o.addExecution(blueprint)
-	o.addImports(blueprint)
+
+	err = o.addImports(blueprint)
+	if err != nil {
+		return err
+	}
+
 	return blueprints.NewBlueprintWriter(blueprintPath).Write(blueprint)
 }
 
@@ -178,9 +184,18 @@ func (o *addManifestDeployItemOptions) addExecution(blueprint *v1alpha1.Blueprin
 	})
 }
 
-func (o *addManifestDeployItemOptions) addImports(blueprint *v1alpha1.Blueprint) {
+func (o *addManifestDeployItemOptions) addImports(blueprint *v1alpha1.Blueprint) error {
 	o.addTargetImport(blueprint, o.clusterParam)
 	o.addStringImport(blueprint, o.targetNsParam)
+
+	for _, p := range *o.importParams {
+		err := o.addImport(blueprint, p)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (o *addManifestDeployItemOptions) addTargetImport(blueprint *v1alpha1.Blueprint, name string) {
@@ -217,6 +232,22 @@ func (o *addManifestDeployItemOptions) addStringImport(blueprint *v1alpha1.Bluep
 		},
 		Required: &required,
 	})
+}
+
+func (o *addManifestDeployItemOptions) addImport(blueprint *v1alpha1.Blueprint, paramDef string) error {
+	importDefinition, err := o.parseImportDefinition(paramDef)
+	if err != nil {
+		return err
+	}
+
+	for i := range blueprint.Imports {
+		if blueprint.Imports[i].Name == importDefinition.Name {
+			return nil
+		}
+	}
+
+	blueprint.Imports = append(blueprint.Imports, *importDefinition)
+	return nil
 }
 
 func (o *addManifestDeployItemOptions) existsExecutionFile() (bool, error) {
@@ -287,4 +318,37 @@ func (o *addManifestDeployItemOptions) writeExecution(f *os.File) error {
 	}
 
 	return nil
+}
+
+// parseImportDefinition creates a new ImportDefinition from a given parameter definition string.
+// The parameter definition string must have the format "name:type", for example "replicas:integer".
+// The supported types are: string, boolean, integer
+func (o *addManifestDeployItemOptions) parseImportDefinition(paramDef string) (*v1alpha1.ImportDefinition, error) {
+	a := strings.Index(paramDef, ":")
+
+	if a == -1 {
+		return nil, fmt.Errorf(
+			"import parameter definition %s has the wrong format; the expected format is name:type",
+			paramDef)
+	}
+
+	name := paramDef[:a]
+	typ := paramDef[a+1:]
+
+	if !(typ == "string" || typ == "boolean" || typ == "integer") {
+		return nil, fmt.Errorf(
+			"import parameter definition %s contains an unsupported type; the supported types are string, boolean, integer",
+			paramDef)
+	}
+
+	schema := fmt.Sprintf("{ \"type\": \"%s\" }", typ)
+	required := true
+
+	return &v1alpha1.ImportDefinition{
+		FieldValueDefinition: v1alpha1.FieldValueDefinition{
+			Name:   name,
+			Schema: v1alpha1.JSONSchemaDefinition(schema),
+		},
+		Required: &required,
+	}, nil
 }
