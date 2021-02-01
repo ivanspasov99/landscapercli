@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/gardener/landscaper/pkg/apis/core"
-	lsv1alpha1 "github.com/gardener/landscaper/pkg/apis/core/v1alpha1"
+	lsv1alpha1 "github.com/gardener/landscaper/apis/core"
 	"github.com/gardener/landscaper/pkg/apis/core/validation"
 	"github.com/gardener/landscaper/pkg/kubernetes"
 	"github.com/gardener/landscaper/pkg/landscaper/blueprints"

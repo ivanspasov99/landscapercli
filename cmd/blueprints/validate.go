@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	"github.com/gardener/landscaper/pkg/apis/core"
-	lsv1alpha1 "github.com/gardener/landscaper/pkg/apis/core/v1alpha1"
+	lsv1alpha1 "github.com/gardener/landscaper/apis/core"
 	"github.com/gardener/landscaper/pkg/apis/core/validation"
 	"github.com/gardener/landscaper/pkg/kubernetes"
 )
